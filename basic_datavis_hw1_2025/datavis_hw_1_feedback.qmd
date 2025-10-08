@@ -1,0 +1,888 @@
+---
+title: "BI_retarining_datavis_hw_1"
+author: "Oksana Plastinina"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(patchwork)
+library(gghighlight)
+
+hogwarts <- read_csv("data/hogwarts_2025.csv")
+```
+
+```{r}
+#тема ко всему документу
+theme_set(theme_bw())
+
+#частоиспользуемые вектора
+house_names <- c("Gryffindor" =  "Гриффиндор",
+      "Hufflepuff" = "Пуффендуй",
+      "Ravenclaw" = "Когтевран",
+      "Slytherin" = "Слизерин")
+house_colours <- c("Gryffindor" = "#C50000",
+                "Hufflepuff" = "#ECB939",
+                "Ravenclaw" = "#41A6D9",
+                "Slytherin" = "#1F5D25")
+bloodStatus_values <- c( 'half-blood' = "lightblue4",
+                "muggle-born" = "sienna3",
+                "pure-blood" = "mediumpurple4")
+bloodStatus_labels <- c(
+      'half-blood' = "Полукровка",
+      "muggle-born" = "Маглорожденный",
+      "pure-blood" = "Чистокровка")
+```
+
+### 1.
+
+```{r fig.width=10, fig.height=6}
+ggplot(hogwarts)+
+  geom_bar(aes(x = as.factor(course)), fill = 'seagreen', colour = 'black')+
+  labs(
+    title = 'Распределение числа студентов по курсу в Хогвартсе',
+    x = 'Номер курса',
+    y = 'Количество студентов'
+       )+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =15)
+  )
+```
+
+> Результат: 0.85 б.
+
+> Комментарии:
+
+- Хорошая работа! Здорово, что вы попробовали дополнительно отрегулировать настройки осей.
+
+- Здорово, что в начале документа вы прописали частотные конструкции, которые будут употребляться в дальнейшем: переводы осей, разметку цветов.
+
+- Настройка темы в начале документа – хорошая практика! Так не придется настраивать ее в последующем для каждого отдельного графика.
+
+- Единственный момент -- график в целом читаемый, но кегль шрифта в довольно пограничной зоне -- еще чуть-чуть, и он будет мелким и неудобным для восприятия. Лучше делать текстовые элементы крупнее. 
+
+### 2.
+
+```{r fig.width=10, fig.height=6}
+ggplot(hogwarts)+
+  geom_bar(aes(x = as.factor(house), fill = bloodStatus), colour = 'black')+
+  labs(
+    title = 'Распределение числа студентов по факультетам',
+    x = NULL,
+    y = 'Количество студентов' )+
+  scale_fill_manual(
+    name = 'Статус крови',
+    values = bloodStatus_values, 
+    labels = bloodStatus_labels
+    )+
+  scale_x_discrete(
+    labels = house_names
+  )+
+  scale_y_continuous(breaks = seq(0,150,15))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =16)
+  )
+```
+
+```{r fig.width=10, fig.height=6}
+bloodStatus_hogwarts <- ggplot(hogwarts)+
+  geom_bar(aes(x = as.factor(house), fill = bloodStatus), colour = 'black', position = 'fill', )+
+  labs(
+    title = 'Распределение студентов разного происхождения внутри факультетов',
+    x = NULL,
+    y = 'Количество студентов (в долях)' )+
+  scale_fill_manual(
+    name = 'Статус крови',
+    values = bloodStatus_values, 
+    labels = bloodStatus_labels
+    )+
+  scale_x_discrete(
+    labels = house_names
+  )+
+  scale_y_continuous(breaks = seq(0,1,0.1))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =16)
+  )
+
+bloodStatus_hogwarts
+```
+
+Доли волшебников разного происхождения на каждом из факультетов, за некотрым исключением, примерно равны. Полукровки составляют наибольшую долю волшебников на каждом из факультетов (от 65%). Чистокровки также есть на кадом из факультетов, доля их числа составляет примерно 15 и 25% (Гриффиндор и Слизерин соответственно). Маглорожденные волшебники не учатся на Слизерине, доли их числа составляют примерно 8 и 20% (Пуффендуй и Гриффиндор соответсвенно).
+
+> Результат: 1.85 б.
+
+> Комментарии:
+
+- Хороший результат, корректная интерпретация, все здорово.
+
+- Примечание: оценивал преимущественно второй график.
+
+
+### 3.
+
+```{r fig.width=11, fig.height=6}
+hogwarst_week3 <- hogwarts %>% 
+  group_by(house) %>% 
+  arrange(week_3, result, house) %>% 
+  summarise(
+    meadian_w3 = median(week_3,na.rm = T),
+    mean_w3 = mean(week_3,na.rm = T)
+  ) 
+
+hogwarts_house_result <- hogwarts %>% 
+  ggplot()+
+  #здесь при построении графика сразу упорядочиваем в порядке убывания медианного балла 
+  geom_violin(aes(x = fct_reorder(house, week_3, .desc = T), y = week_3, fill = house))+
+  geom_boxplot(aes(x = house, y = week_3), width = 0.1, colour = 'grey40')+
+  geom_point(data=hogwarst_week3, aes(x=house, y = mean_w3), shape = 16, size = 2.5)+
+  labs(
+    title = 'Распределение набранных баллов студентов факультетов за третью неделю обучения',
+    caption = 'Примечание: точкой обозначены средние значения баллов',
+    x = NULL,
+    y = 'Количество баллов'
+  )+
+  scale_fill_manual(
+    values = house_colours)+
+  scale_x_discrete(labels = house_names)+
+  scale_y_continuous(breaks = seq(-25,25,5))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    axis.title = element_text(size = 12.5),
+    axis.text.x = element_text(size =13),
+    legend.position = 'none'
+  )
+
+hogwarts_house_result
+```
+
+> Результат: 1.5 б.
+
+> Комментарии:
+
+- Хороший результат, визуально все здорово.
+
+- Интересное решение с добавлением среднего. Эксперименты -- это хорошая практика. Отлично, что вы не боитесь выходить за рамки задания.
+
+- Хорошая донастройка темы, более крупный шрифт сразу приятнее читать.
+
+- Не про датавиз, но все же напишу: `TRUE` и `FALSE` лучше прописывать целиком. Это страхует от ситуации, когда литеры `T` и `F` выступают в роли переменных.
+
+- К сожалению, у графика отсутсвует интерпретация.
+
+### 4.
+
+```{r fig.width=10, fig.height=9}
+hogwarts %>% 
+  ggplot()+
+  geom_histogram(aes(x = `Flying exam`), fill = 'seagreen', colour = 'black', bins = 20)+
+  facet_grid(as.factor(course)~.)+
+  labs(
+    title = 'Распределение баллов за экзамен по полету на метле студентами разных курсов',
+    x = 'Количество баллов',
+    y = 'Чисто студентов'
+  )+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.title = element_text(size = 11)
+  )
+```
+
+> Результат: 0.75 б.
+
+> Комментарии:
+
+- Это неплохой график, но, заданной в условии максимальной компактности больше соответствует применение функции `facet_wrap()`, которая стремится максимально “оквадратить” итоговую панель с графиками.
+
+- Однако, из двух опций фасетирования гридом вы выбрали более подходящий вариант -- фасетирование по строкам действительно уместнее фасетирования по столбцам, в случае классической гистограммы, поскольку основная интересующая нас информация распределена вдоль оси X.
+
+
+### 5.
+
+```{r fig.width=10, fig.height=6}
+ggplot(hogwarts, aes(y = result, x = `Herbology exam`))+
+  geom_point(shape = 21, fill = 'grey40', colour = 'grey40')+
+  scale_x_continuous(breaks = seq(0, 100, 5))+ 
+  scale_y_continuous(breaks = seq(-300,300,50))+
+  labs(title = 'Взаимосвязь суммарнного балла студента за год и его оценки за экзамен по травологии',
+       x = 'Оценка по травологии',
+       y = 'Балл студента за год')+
+  geom_smooth(method = 'lm', se = F, colour = 'purple')+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.title = element_text(size = 11)
+  )
+```
+
+Количество набранных студентом баллов за год и его оценка по травологии положительно коррелируют, т.е. чем выше балл, тем выше оценка. Большая часть студентов получила суммарный балл \>-50 и оценку по травологии \>65. При этом наблюдаются выбросы, т.е. есть студенты, получившие высокую отметку за экзамен (\>65) и низкий суммарный балл (\<-50).
+
+> Результат: 1.5 б.
+
+> Комментарии:
+
+- Хороший график и неплохая интерпретация. Ниже пара комментариев.
+
+- Единственные пожелание -- лучше поменять оси x и y, потому что при построении диаграмм рассеяния есть негласное правило располагать зависимую переменную на оси ординат, независимую на оси абсцисс (так удобнее судить о форме зависимости Y от X, строить линии регрессии и т.п.).
+
+- Вы здорово работаете с отческами и сеткой. Они не слишком частые и не зашумливают пространство, и в то же время делают график достаточно подробным.
+
+- Эксперименты с "раскрашенными" точками выглядят любопытно, но конкретно в этом случае я не до конца понял идею использования, если и контуру и заливке присвоен один и тот же цвет.
+
+- Я бы еще аккуратнее отнесся к термину "выброс". Термин этот, несмотря на кажущуюся простоту [достаточно дискутабелен](https://t.me/choking_data/36). С моей точки зрения описанные наблюдения соответствуют общему тренду и не выглядят как явные выбросы.
+
+
+### 6.
+
+```{r fig.width=14, fig.height=9}
+
+hogwarts %>% 
+  select(id, house, result, `Herbology exam`, `Muggle studies exam`, `Arithmancy exam`, `Potions exam`) %>% 
+  rename('Травология' = `Herbology exam`, 'Магловедение' = `Muggle studies exam`, 'Нумерология' = `Arithmancy exam`, 'Зельеварение'= `Potions exam`)  %>% 
+  pivot_longer(c('Травология', 'Магловедение', 'Нумерология', 'Зельеварение'), names_to = 'exams', values_to = 'score') %>% 
+  ggplot(aes(y = result, x = score))+
+  geom_point(aes(colour = house)) +
+  facet_wrap(.~exams, ncol = 2)+
+  labs(title = 'Взаимосвязь суммарнного балла студента за год и его оценки за экзамены',
+       x = 'Отметка за экзамен',
+       y = 'Балл студента за год')+
+  scale_colour_manual( name = 'Факультеты',
+    values = house_colours,
+    labels = house_names) +
+  scale_x_continuous(breaks = seq(0,100,10))+
+  scale_y_continuous(breaks = seq(-250,300,50))+
+  geom_smooth(method = 'lm', se = F, colour = 'blue')+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 17),
+    axis.title = element_text(size = 12)
+  )
+```
+
+Для всех экзаменах, кроме зельеварения, можно говорить о положительной корреляции суммарного балла студента за год и его отметки за экзамен. Отметка по экзамену по зельеварению с суммарным баллом не коррелирует.
+
+Отметки студентов разных факультетов за экзамены распредлены равномерно, за исключением экзамена по зельеварению, где отметку \>70 получили только студенты Слизерина (практически все). При этом самые низкие отметки по остальным экзаменом принадлежат примущественно студентам этого факультета \<30 по магловедению, \<20 по нумерологии, \<60 по травологии.
+
+Лучше всего студенты всех факультетов сдавали травологию, никто не получил отмеку, ниже примерно 30 баллов.
+
+> Результат: 1.75 б.
+
+> Комментарии:
+
+- Хорошая работа, достойное техническое исполнение. Еще можно было отметить, что студенты на факультете Слизерин формируют два кластера -- в области высоких и низких баллов за год.
+
+- На графике с фасетированием шрифт, к сожалению, снова становится менее читаемым в силу небольшого размера.
+
+### 7.
+
+```{r fig.width=14, fig.height=9}
+hogwarts %>% 
+  select(id, house, result, `Herbology exam`, `Muggle studies exam`, `Arithmancy exam`, `Potions exam`) %>% 
+  rename('Травология' = `Herbology exam`, 'Магловедение' = `Muggle studies exam`, 'Нумерология' = `Arithmancy exam`, 'Зельеварение'= `Potions exam`)  %>% 
+  pivot_longer(c('Травология', 'Магловедение', 'Нумерология', 'Зельеварение'), names_to = 'exams', values_to = 'score') %>% 
+  ggplot(aes(y = result, x = score, colour = house))+
+  geom_point() +
+  facet_wrap(.~exams, ncol = 2)+
+  geom_smooth(method = 'lm', se = F)+
+  labs(title = 'Взаимосвязь суммарных баллов студентов разных факультетов за год и их оценки за экзамены',
+       x = 'Отметка за экзамент',
+       y = 'Балл студента за год')+
+  scale_colour_manual( name = 'Факультеты',
+    values = house_colours,
+    labels = house_names) +
+  scale_x_continuous(breaks = seq(0,100,10))+
+  scale_y_continuous(breaks = seq(-250,300,50))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 17),
+    axis.title = element_text(size = 12)
+  )
+```
+
+Группировка линий трендов по факультетам позволила рассмотреть дополнительные характеристики взаимосвязей годового балла студента и его отметкой за 4 представленных экзамена. А именно: 1) взаимосвязь суммарного балла студентов всех факультетов на экзменах, исключая зельеварение, есть и является положительной; 2) при этом, угол наклона линии тренда факультета Слизерина для всех экзменов, исключая зельеварение, наибольший, что говорит о сравнительно бOльшей взаимосвязи суммарнного балла и соответсвующего экзамена; 3) углы наклонов линий трендов (и соответственно взаимосвязи) остальных трех факультетов для всех экзменов, исключая зельеварение, схожи. При этом каждый отдельный студент Когтеврана набрал за год бОльшее количество баллов в сравнении с отдельными студентами Гриффиндора и Пуффендуя; 4) ни для одного из факультетов не обнаружена корреляция суммарного балла и отметки за экзамен по зельеварению.
+
+> Результат: 1.25 б.
+
+> Комментарии:
+
+- Очень подробное описание графика -- выглядит здорово! Только поспорю, что *каждый отдельный студент Когтеврана набрал за год бОльшее количество баллов в сравнении с отдельными студентами Гриффиндора и Пуффендуя*: я могу найти на графике каждого экзамена студентов из Когтеврана, которые набрали меньше баллов чем некоторые представители Гриффиндора или Пуффендуя.
+
+- Сам нередко грешу очепятками, но не могу не заметить любопытную подпись оси X.
+
+- По поводу линий тренда по факультетам -- это неплохой подход, но в некотором смысле дублирующий уже имеющуюся информацию. К тому же, он не вполне удовлетворяет условию `одно из наблюдений на предыдущем этапе, относящееся ко всем 4-м экзаменам`. Здесь имелось в виду довольно характерное бимодальное распределение студентов факультета Слизерин -- есть группа студентов с высоким итоговым баллом, и их антагонисты с низким, причем в 3-х из 4-х случаев их оценка за экзамен совпадает с общим трендом. Студенты на других факультетах не имеют такой широкой пропасти между теми, кто набрал много, и набрал мало. Дальше можно было бы поперебирать разные категориальные переменные, и посмотреть, что получается. В теории мы могли бы прийти к результату, когда на каждом графике имеется 2 линии тренда: одна для мальчиков, и одна для девочек.
+
+- Мелкий технический комментарий -- в данном случае можно не передавать в `facet_wrap()` число столбцов -- он по умолчанию делает итоговый график маскимально квадратным, т.е. приводит к состоянию 2x2.
+
+### 8.
+
+```{r}
+hogwarts_2exams <- hogwarts %>% 
+  rename('Экзамен по защите от темных искусств' = `Defence against the dark arts exam`, 'Экзамен по прорицанию' = `Divinations exam`) %>% 
+  pivot_longer(c('Экзамен по защите от темных искусств', 'Экзамен по прорицанию'), values_to = 'score', names_to = 'exams')
+```
+
+```{r fig.width=13, fig.height=4}
+hist_darkdef_diviation <- hogwarts_2exams %>% 
+  ggplot(aes(x = score, fill = exams))+
+  geom_histogram(alpha = 0.5, colour = 'black', bins = 20)+
+  labs(
+    x = 'Балл за экзамен',
+    y = 'Количество учеников'
+  )+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  scale_y_continuous(breaks = seq(0,150,20))+
+  scale_fill_manual(
+    name = NULL,
+    values = c('Экзамен по защите от темных искусств' = 'mediumorchid4',
+               'Экзамен по прорицанию' = 'peru')
+  )+
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.text = element_text(size = 15),
+    axis.title = element_text(size = 17),
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11),
+    legend.position = 'bottom',
+    legend.justification = 'centre',
+    legend.direction = 'horizontal'
+  )
+```
+
+```{r fig.width=10, fig.height=6}
+boxplot_darkdef_diviation <- hogwarts_2exams %>% 
+  ggplot()+
+  geom_boxplot(aes(y = score, x = exams, fill = exams), alpha = 0.7)+
+  labs(
+    x = NULL,
+    y = 'Балл за экзамен'
+  )+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  scale_fill_manual(
+    values = c('Экзамен по защите от темных искусств' = 'mediumorchid4',
+               'Экзамен по прорицанию' = 'peru')
+  )+
+  theme(
+    plot.title = element_text(hjust = 0.5 ),
+    legend.position = 'none',
+    axis.title = element_text(size = 17),
+    axis.text.y = element_text(size = 11),
+    #axis.text.x = element_text(size = 15),
+    #уберем, тк в легенде четку обозначена цветовая группировка
+    axis.text.x = element_blank()
+  )
+
+```
+
+```{r}
+jitter_darkdef_diviation <- hogwarts_2exams %>% 
+  ggplot()+
+geom_jitter(aes(x = exams, y = score, colour = exams))+
+  labs(
+    x = NULL,
+    y = 'Балл за экзамен'
+  )+
+  scale_y_continuous(breaks = seq(0,100,10))+
+ scale_color_manual(
+    values = c('Экзамен по защите от темных искусств' = 'mediumorchid4',
+               'Экзамен по прорицанию' = 'peru')
+  )+
+  theme(
+    plot.title = element_text(hjust = 0.5 ),
+    legend.position = 'none',
+    axis.title = element_text(size = 17),
+    axis.text.y = element_text(size = 11),
+    #axis.text.x = element_text(size = 15),
+     #уберем, тк в легенде четку обозначена цветовая группировка
+    axis.text.x = element_blank()
+  )
+```
+
+```{r fig.width=20, fig.height=10}
+(boxplot_darkdef_diviation | jitter_darkdef_diviation)/
+hist_darkdef_diviation+
+    plot_annotation(
+    title = "Разпределение отметок по экзаменам по прорицанию и защите от темных искусств",
+    theme = theme(plot.title = element_text(hjust = 0.5, size = 30)))
+```
+
+Распредления баллов за два экзамена различаются. В счучае экзамена по защите от темных исскуств студенты получили отметки во всем диапазоне 0-100 баллов, при этом чаще получали отметки в диапазоне 0-40, реже - 40-60. Медианное значение отметки по этому экзамену - 50. В случае экзамена по прорицанию отметки получали в диапазоне 0-60. Немногие студенты получили балл \>40. Медианное значение отметки по этому экзамену \~13.
+
+> Результат: 2 б.
+
+> Комментарии:
+
+- Отличная работа, мне все нравится! Вы здорово потрудились над настройкой визуальной части и удалением лишних элементов и отлично разобрались с `patchwork`. Единственная вещь -- можно было еще убрать дублирующуюся ось Y в верхнем блоке за счет добавления `plot_layout(axe = "collect")`, но это уже мелочи.
+
+- Для двух графиков повторяется тема -- вариантом было бы сохранить ее в переменную и переиспользовать в процессе, чтобы не писать два раза.
+
+- В интерпретации бы еще добавил, что у защиты от темных искусств распределение демонстрирует некоторую бимодальность -- есть два довольно заметных пика по частоте и "долина" между ними.
+
+### 9.
+
+```{r fig.width=10, fig.height=5}
+hogwarts_potionsmean_bloodstatus <- hogwarts %>% 
+  mutate(bloodStatus = factor(bloodStatus, level = c ('muggle-born', 'half-blood', 'pure-blood'))) %>% 
+  group_by(bloodStatus) %>% 
+  summarise(`Среднее по зельеварению` = mean(`Potions exam`))
+
+hogwarts %>% 
+  #упорядочиваем переменную происхождения
+  mutate(bloodStatus = factor(bloodStatus, level = c ('muggle-born', 'half-blood', 'pure-blood'))) %>% 
+  ggplot(aes(x = bloodStatus, y = `Potions exam`))+
+  geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(aes(fill = bloodStatus),colour = 'grey40', width = 0.1, alpha = 0.7)+
+  geom_point(data = hogwarts_potionsmean_bloodstatus, aes(x=bloodStatus, y = `Среднее по зельеварению`), size = 4, shape = 23, fill = 'brown3', colour = 'grey40')+
+  labs(
+    title = 'Распределение баллов по зельеварению у студентов разного происхождения',
+    x = NULL,
+    y = 'Балл за экзамен',
+    caption = 'Примечание: точкой обозначены средние значения баллов'
+  )+
+  scale_fill_manual(values = bloodStatus_values)+
+  scale_x_discrete(labels = bloodStatus_labels)+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5 ),
+    axis.text.x = element_text(color = "black", size = 11),
+    axis.text.y = element_text(color = "black", size = 10),
+    axis.title = element_text(size = 13),
+    legend.position = 'none',
+    plot.caption = element_text(size = 8, colour = 'grey25')
+  )
+```
+
+Полукровки и чистокровки получали баллы по экзамену по зельеварению во всем диапазоне значений (0-100), маглорожденные волшебники не получили оченок выше 70 баллов и имеют наименьший средний балл по экзамену. При этом разрыв баллов между группами небольшой, \~20 баллов. Медианные значения примерно равны средним.
+
+Чтобы найти объяcнения полученным результатам, обратимся к графикам распределения баллов по зельеварению у студентов разных факультетов и распределению студентов разного происхождения внутри факультетов. Из первого графика мы видим, что отметки по зельеварению \>70 получили только студенты Слизерина, при этом, как видно на втором графике, маглорожденные студенты не учатся на этом факультете. Т.е. и значения баллов \>70 полукровок и чистокровок соответствуют только студентам Слизерина. Это объясняет отсутвие баллов \>70 только у маглорожденных студентов.
+
+Распределение cуммарных баллов за год у студентов разного происхождления показывает, маглорожденные студенты не учатся сильно хуже остальных, средние глобально не различаются, маглорожденные не получили самых высоких баллов, но и не получали баллов ниже -100. Студенты Слизерина же не отличаются исключительно высокими баллами (см. Распределение cуммарных баллов за год у студентов разных факультетов), их студенты скорее разделились на две группы: те, кто получил \>50 и \<-50 баллов (если смотреть на график задания 12 Распределение числа баллов у студентов различных факультетов Хогвартса в 2024-2025 учебном году, то видно, что это группы, различные по полу). Т.е. студенты Слизерина не самые преуспевающие в школе, а маглорожденные студенты не самые отстающие.
+
+Графики 'Распределения баллов по экзаменам у маглорожденных волшебников и студентов Слизерина' и 'Распределения баллов по экзаменам у студентов разных факультетов' показывают, что такие значительные различия баллов между студентами факультета Слизерина и маглорожденными студентами и студентами разных факультетов наблюдаются только для экзамена по зельеварению.
+
+Таким образом можно сделать вывод, что экзамен по зельеварению оценивался предвзято, в пользу студентов Слизерина, вне зависимости от происхождения студента.
+
+```{r fig.width=22, fig.height=8}
+hogwarts_potionsmean_house <- hogwarts %>% 
+  group_by(house) %>% 
+  summarise(`Среднее по зельеварению` = mean(`Potions exam`))
+
+Hogwarts_potion_house <- hogwarts %>% 
+  ggplot(aes(x = house, y = `Potions exam`))+
+  geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(aes(fill = house),colour = 'grey40', width = 0.1, alpha = 0.7)+
+  geom_point(data = hogwarts_potionsmean_house, aes(x=house, y = `Среднее по зельеварению`), size = 4, shape = 23, fill = 'grey25', colour = 'grey40')+
+  labs(
+    title = 'Распределение баллов по зельеварению у студентов разных факультетов',
+    x = NULL,
+    y = 'Балл за экзамен',
+    caption = 'Примечание: точкой обозначены средние значения баллов'
+  )+
+  scale_fill_manual(values = house_colours)+
+  scale_x_discrete(labels = house_names)+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =19),
+    axis.text.x = element_text(color = "black", size = 15),
+    axis.text.y = element_text(color = "black", size = 13),
+    axis.title = element_text(size = 15),
+    legend.position = 'none',
+    plot.caption = element_text(size = 11, colour = 'grey25')
+  )
+
+bloodStatus_hogwarts2 <- ggplot(hogwarts)+
+  geom_bar(aes(x = as.factor(house), fill = bloodStatus), colour = 'black', position = 'fill', )+
+  labs(
+    title = 'Распределение студентов разного происхождения внутри факультетов',
+    x = NULL,
+    y = 'Количество студентов (в долях)' )+
+  scale_fill_manual(
+    name = 'Статус крови',
+    values = bloodStatus_values, 
+    labels = bloodStatus_labels
+    )+
+  scale_x_discrete(
+    labels = house_names
+  )+
+  scale_y_continuous(breaks = seq(0,1,0.1))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =19),
+    axis.text.x = element_text(color = "black", size = 15),
+    axis.text.y = element_text(color = "black", size = 13),
+    axis.title = element_text(size = 15),
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 13)
+  )
+
+(Hogwarts_potion_house|bloodStatus_hogwarts2)
+```
+
+```{r fig.width=22, fig.height=8}
+hogwarts_resultmean_bloodStatus <- hogwarts %>% 
+  group_by(bloodStatus) %>% 
+  summarise(`Средний балл` = mean(result))
+
+Hogwarts_result_bloodstatus <- hogwarts %>% 
+  ggplot(aes(x = bloodStatus, y = result))+
+  geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(aes(fill =  bloodStatus), colour = 'grey40', width = 0.1, alpha = 0.7)+
+  geom_point(data = hogwarts_resultmean_bloodStatus, aes(x = bloodStatus, y = `Средний балл`), size = 4, shape = 23, fill = 'grey25', colour = 'grey40')+
+  labs(
+    title = 'Распределение cуммарных баллов за год у студентов разного происхождления',
+    x = NULL,
+    y = 'Суммарный балл за год',
+    caption = 'Примечание: точкой обозначены средние значения баллов'
+  )+
+  scale_fill_manual(values = bloodStatus_values)+
+  scale_x_discrete(labels = bloodStatus_labels)+
+  scale_y_continuous(breaks = seq(-250,300,50))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =19 ),
+    axis.text.x = element_text(color = "black", size = 15),
+    axis.text.y = element_text(color = "black", size = 13),
+    axis.title = element_text(size = 15),
+    legend.position = 'none',
+    plot.caption = element_text(size = 11, colour = 'grey25'),
+    
+  )
+
+hogwarts_resultmean_house <- hogwarts %>% 
+  group_by(house) %>% 
+  summarise(`Средний балл` = mean(result))
+
+Hogwarts_result_house <- hogwarts %>% 
+  ggplot(aes(x = house, y = result))+
+  geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(aes(fill = house), colour = 'grey40', width = 0.1, alpha = 0.7)+
+  geom_point(data = hogwarts_resultmean_house, aes(x = house, y = `Средний балл`), size = 4, shape = 23, fill = 'grey25', colour = 'grey40')+
+  labs(
+    title = 'Распределение cуммарных баллов за год у студентов разных факультетов',
+    x = NULL,
+    y = 'Суммарный балл за год',
+    caption = 'Примечание: точкой обозначены средние значения баллов'
+  )+
+  scale_fill_manual(values = house_colours)+
+  scale_x_discrete(labels = house_names)+
+  scale_y_continuous(breaks = seq(-250,300,50))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 19 ),
+    axis.text.x = element_text(color = "black", size = 15),
+    axis.text.y = element_text(color = "black", size = 13),
+    axis.title = element_text(size = 15),
+    legend.position = 'none',
+    plot.caption = element_text(size = 11, colour = 'grey25')
+  )
+
+Hogwarts_result_bloodstatus | Hogwarts_result_house
+```
+
+```{r fig.width=27, fig.height=19}
+Hogwarts_examsall_blood <- hogwarts %>% 
+  #фильтруем маглорожденных волшебников и чистокровных волшебников, учащихся слизарина
+  filter(bloodStatus == 'muggle-born' | house == 'Slytherin') %>% 
+  select(id, bloodStatus, house, result, `Herbology exam`, `Muggle studies exam`, `Arithmancy exam`, `Potions exam`, `Defence against the dark arts exam`, `Flying exam`, `Astronomy exam`, `Divinations exam`, `Charms exam`, `History of magic exam`, `Study of ancient runes exam`, `Care of magical creatures exam`) %>% 
+  rename('Травология' = `Herbology exam`, 'Магловедение' = `Muggle studies exam`, 'Нумерология' = `Arithmancy exam`, 'Зельеварение'= `Potions exam`, 'Защита от темных искусств' = `Defence against the dark arts exam`, 'Полет на метле' = `Flying exam`, 'Астрономия' = `Astronomy exam`, 'Гадание' = `Divinations exam`, 'Заклинания' = `Charms exam`, 'История магии' = `History of magic exam`, 'Древние руны' = `Study of ancient runes exam`, 'Магические существа' = `Care of magical creatures exam`)  %>% 
+  pivot_longer(c('Травология', 'Магловедение', 'Нумерология', 'Зельеварение','Защита от темных искусств', 'Полет на метле', 'Астрономия', 'Гадание', 'Заклинания', 'История магии', 'Древние руны', 'Магические существа'), names_to = 'exams', values_to = 'score') %>% 
+  
+  ggplot(aes(y = exams, x = score, fill = bloodStatus))+
+  #geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(colour = 'grey40', width = 0.3, alpha = 0.7)+
+  labs(
+    title = 'Распределение баллов по экзаменам у маглорожденных волшебников и студентов Слизерина',
+    y = NULL,
+    x = 'Балл за экзамен'
+  )+
+  scale_fill_manual( name = NULL,
+                    labels = bloodStatus_labels,
+                    values = bloodStatus_values)+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =18, face = "bold"  ),
+    axis.text.y = element_text(color = "black", size = 16.5),
+    axis.text.x = element_text(color = "black", size = 15),
+    axis.title = element_text(size = 18),
+    plot.caption = element_text(size = 8, colour = 'grey25'),
+    legend.position = 'bottom',
+    legend.justification = 'centre',
+    legend.direction = 'horizontal',
+    legend.text = element_text(size = 15),
+    legend.title = element_text(size = 15)
+  )
+
+Hogwarts_examsall_house <- hogwarts %>% 
+  select(id, bloodStatus, house, result, `Herbology exam`, `Muggle studies exam`, `Arithmancy exam`, `Potions exam`, `Defence against the dark arts exam`, `Flying exam`, `Astronomy exam`, `Divinations exam`, `Charms exam`, `History of magic exam`, `Study of ancient runes exam`, `Care of magical creatures exam`) %>% 
+  rename('Травология' = `Herbology exam`, 'Магловедение' = `Muggle studies exam`, 'Нумерология' = `Arithmancy exam`, 'Зельеварение'= `Potions exam`, 'Защита от темных искусств' = `Defence against the dark arts exam`, 'Полет на метле' = `Flying exam`, 'Астрономия' = `Astronomy exam`, 'Гадание' = `Divinations exam`, 'Заклинания' = `Charms exam`, 'История магии' = `History of magic exam`, 'Древние руны' = `Study of ancient runes exam`, 'Магические существа' = `Care of magical creatures exam`)  %>% 
+  pivot_longer(c('Травология', 'Магловедение', 'Нумерология', 'Зельеварение','Защита от темных искусств', 'Полет на метле', 'Астрономия', 'Гадание', 'Заклинания', 'История магии', 'Древние руны', 'Магические существа'), names_to = 'exams', values_to = 'score') %>% 
+  
+  ggplot(aes(y = exams, x = score, fill = house))+
+  #geom_jitter(size = 0.7, shape = 21, colour = 'grey40', fill = 'grey40')+
+  geom_boxplot(colour = 'grey40', width = 0.3, alpha = 0.7)+
+  labs(
+    title = 'Распределение баллов по экзаменам у студентов разных факультетов',
+    y = NULL,
+    x = 'Балл за экзамен'
+  )+
+  scale_fill_manual( name = NULL,
+                    labels = house_names,
+                    values = house_colours)+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =20, face = "bold" ),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(color = "black", size = 18),
+    axis.title = element_text(size = 18),
+    plot.caption = element_text(size = 8, colour = 'grey25'),
+    legend.position = 'bottom',
+    legend.justification = 'centre',
+    legend.direction = 'horizontal',
+    legend.text = element_text(size = 15),
+    legend.title = element_text(size = 15)
+  )
+
+Hogwarts_examsall_blood|Hogwarts_examsall_house
+```
+
+> Результат: 3.75
+
+> Комментарии:
+
+- Подробная, конкретная и точная интерпретация -- в этом плане все отлично. 
+
+- Необычный способ визуализации первого графика в плане сочетания параметров -- средние + межквартильный размах, но с позиций задания, вполне валидный. В качестве альтернативы можно было задать SD, SE или доверительный интервал (если вы его уже проходили с Евгением, или встречались с ним до курса) при помощи `geom_errorbar` и `geom_poinrange`.
+
+- В последнем чанке вы дважды создаете датасет со сходными шагами. Более экономичным решением может быть сохранение общего этапа в этих датафреймах в переменную и дальнейшее быстрое переиспользование при создании второго ()
+
+- Визуально мне не очень нравится идея узких боксплотов и широкой полосы джиттера -- я бы предложил сделать наоборот: оставить боксплоту все пространство, а джиттер сгруппировать ближе к центру фигуры.
+
+- Отлично, что вы подробно комментируете происходящее в коде -- это очень хорошая практика.
+
+- Левый график на последнем изображении -- интересная, но не самая интуитивная реализация. Возможно, исходный график (в первом чанке задания) с фасетированием или группировкой по факультетам мог бы быть оптимальным решением в такой ситуации.
+
+
+### 10.
+
+```{r fig.width=8, fig.height=5}
+#исходный график
+hogwarts %>% 
+  ggplot()+
+  geom_point(aes(x = `Charms exam`, y = `Study of ancient runes exam`), shape = 21, fill = 'darkviolet', colour = 'darkviolet')+
+  labs(title = 'Взаимосвязь баллов за экзаменов по заклинаниям и по древним рунам',
+       x = 'Отметка за экзамен по заклинаниям',
+       y = 'Отметка за экзамен по древним рунам')+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =15),
+    axis.title = element_text(size = 12)
+  )
+```
+
+```{r fig.width=10, fig.height=5}
+#смотрим подсказку
+podkazka <- read.csv("data/podskazka.csv")
+
+podkazka %>% 
+  ggplot()+
+  geom_point(aes(x = y, y = x))+
+  scale_y_continuous(limits = c(200, 500))
+```
+
+```{r fig.width=8, fig.height=5}
+#решение №1, использование прозрачности точек
+#таким образом мы видим, что в метах бОльшей плотности точки накладываются друг на друга и выглядят темнее
+hogwarts %>% 
+  ggplot()+
+  geom_point(aes(x = `Charms exam`, y = `Study of ancient runes exam`), alpha = 0.3, shape = 21, fill = 'darkviolet', colour = 'darkviolet')+
+  labs(title = 'Взаимосвязь баллов за экзаменов по заклинаниям и по древним рунам',
+       x = 'Отметка за экзамен по заклинаниям',
+       y = 'Отметка за экзамен по древним рунам')+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =15),
+    axis.title = element_text(size = 12)
+  )
+
+```
+
+```{r fig.width=8, fig.height=5}
+#решение №2, сочетания прозрачности и position = position_jitter()
+#position_jitter вносит некотрый шум на точки, что позволяет из разделить
+#также в областях большей платноси видим более темные точки
+
+hogwarts %>% 
+  ggplot()+
+  geom_point(aes(x = `Charms exam`, y = `Study of ancient runes exam`), position = position_jitter(), alpha = 0.3, shape = 21, fill = 'darkviolet', colour = 'darkviolet')+
+  labs(title = 'Взаимосвязь баллов за экзаменов по заклинаниям и по древним рунам',
+       x = 'Отметка за экзамен по заклинаниям',
+       y = 'Отметка за экзамен по древним рунам')+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =15),
+    axis.title = element_text(size = 12)
+  )
+```
+
+```{r fig.width=10, fig.height=5}
+#решение №3, сочетания прозрачности, разделения на группы и position = position_jitterdodge() 
+#в отличе от position = position_jitter, этот вариант дополнительно разводит точки
+#разделение на группы и использование контрасных цветов позволяет в области оверплоттинга разделять вищуально больше точек
+
+hogwarts %>% 
+  ggplot(aes(x = `Charms exam`, y = `Study of ancient runes exam`))+
+  geom_point(aes(colour = sex), position = position_jitterdodge(), alpha = 0.3, size = 1.5)+
+  labs(title = 'Взаимосвязь баллов за экзаменов по заклинаниям и по древним рунам',
+       x = 'Отметка за экзамен по заклинаниям',
+       y = 'Отметка за экзамен по древним рунам')+
+  scale_colour_manual(name = NULL,
+                    values = c(female = 'tan2',
+                               male = 'dodgerblue'),
+                    labels = c(male = 'мальчики', female = 'девочки')
+                    )+
+  scale_y_continuous(breaks = seq(0,100,10))+
+  scale_x_continuous(breaks = seq(0,100,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =15),
+    axis.title = element_text(size = 12)
+  )
+```
+
+> Результат: 1.5 б.
+
+> Комментарии:
+
+- Первые два решения выглядят отлично и валидно. Что касается третьего -- мне кажется, что, во-первых, оно модифицрует условия задания и добавляет группировку по фактору (чего не было в исходном графике), во-вторых, не привносит потенциально новой механики решения проблемы: и jitter, и прозрачность уже обсуждались выше. В качестве альтернативного третьего решения можно было бы использовать "пустотелые" формы точек (например, `shape=1`).
+
+### 11.
+
+```{r}
+first_30_students <- hogwarts |> 
+  filter(id <= 30) |> 
+  pivot_longer(c(starts_with("week")), names_to = "week_number", values_to = "score") |> 
+  mutate(week_number = week_number |> str_split_i("_", 2) |> as.numeric()) 
+
+```
+
+```{r fig.width=20, fig.height=10}
+first_30_students %>% 
+  mutate(id = as.factor(id)) %>% 
+  ggplot(aes(x = week_number, y = score, group = id))+
+  geom_line(linewidth = 0.3)+
+  gghighlight(house == 'Ravenclaw', 
+              label_key = bloodStatus, 
+              unhighlighted_params = list(colour = 'skyblue', linewidth = 0.3))+
+  labs(title = 'Изменение баллов первых 30 студентов в течение 40 недель',
+       x = 'Номер недели',
+       y = 'Балл студента')+
+  scale_x_continuous(breaks = seq(0,40,5))+
+  scale_y_continuous(breaks = seq(-50,50,10))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size =25),
+    axis.title = element_text(size = 18),
+    axis.text.x = element_text(size = 13),
+    axis.text.y = element_text(size = 13),
+  )
+```
+
+> Результат: 1.75 б.
+
+> Комментарии:
+
+- Отличная работа, мое единственное замечание -- смешение яызков на графике. Метки написаны по-английски, остальной текст -- по-русски. Оптимально приводить на графике все элементы (когда это возможно) к одному языку.
+
+- А еще график и кегль шрифтов крупные, на них приятно смотреть. Спасибо!
+
+### 12.
+
+```{r fig.width=10, fig.height=8}
+#датафрейм для нанесения на график точек, соответсвующим средним значениям
+house_mean_result <- hogwarts %>% 
+group_by(house) %>% 
+  summarise(`Средние по факультетам` = mean(result)) %>% 
+  ungroup()
+
+hogwarts %>% 
+  ggplot()+
+  #построение основного графика
+  geom_violin(aes(x = house, y = result, fill = house))+
+  facet_grid(.~sex, , labeller = labeller(sex = c('male' = 'Мальчики', 'female' = 'Девочки')))+
+  #наслаиваем боксплот
+  geom_boxplot(aes(x = house, y = result), width = 0.1, colour = 'grey40')+
+  #наслаиваем точки, соответсвующие средним значениям + редактируем их формы и цвета
+  geom_point(data = house_mean_result, aes(y = `Средние по факультетам`, x = house), shape = 23, size = 5, fill = 'firebrick4', colour = 'black', stroke = 1.5)+
+  #настройка заголовков и подписей
+  labs( title = 'Баллы студентов Хогвартса',
+        subtitle = 'Распределение числа баллов у студентов различных факультетов Хогвартса в 2024-2025 учебном году',
+        caption = 'Источник: нездоровая фантазия автора лекции',
+        y = 'Количество очков',
+        x = NULL
+  )+
+  #настройка легенды
+  scale_fill_manual(
+    name = 'Факульетет',
+    values = house_colours,
+    labels = house_names
+  )+
+  scale_y_continuous(breaks = seq(-250,250,50))+
+  #наслаиваем линию 
+  geom_hline(yintercept = 0, linetype= 'dashed', colour = 'pink', linewidth = 1)+
+  #рисуем стрелочку
+  annotate(geom ='curve', x = 3.8, xend = 3.9, y = -50, yend = 10, arrow=arrow(type = 'closed'), curvature = -0.5)+
+  theme(
+    #настраиваем параметры легенды
+    legend.text = element_text(face = "italic", size = 13),
+    legend.position = 'inside',
+    legend.justification = c('centre', 'bottom'),
+    #задаем один шрифт на весь текст на графике, но у меня Times New Roman не работает :)
+    text = element_text(family = "serif"),
+    #настраиваем параметры заголовков и подписей
+    plot.title = element_text(hjust = 0.5 ),
+    plot.subtitle = element_text(hjust = 0.5, colour = 'sienna4'),
+    plot.caption = element_text(size = 11),
+    #настраиваем цвет и размер текста значений на оси у
+    axis.text.y = element_text(color = "black", size = 10),
+    #удяляем подпись оси х
+    axis.text.x = element_blank(),
+    #настраиваем размер подписи оси у и х
+    axis.title = element_text(size = 15),
+    #убираем все линии с графика
+    panel.grid = element_blank()
+    )
+```
+
+График описывает распределение баллов студентов-мальчиков и студентов-девочек разных факультетов.
+
+Большинство студентов Гриффиндора мужского пола получили отметки в диапазоне -100-170 баллов с пиком в районе среденего балла этого факультета (\~25 баллов). Девочки имеют примерно такой же диапазон отметок, но с более пологим их распределением. Студенты-мальчики факультета Пуффендуй имеют похожее распредлеение со студентами Гриффиндора мужского пола, у девочек разброс значений чуть больше, в диапазоне -70-200 баллов, с большим пиком в районе среднего балла этого факультета (\~50 баллов), и небольшим пиком в районе \~125 баллов. В целом можно говорить о схожести распределений баллов студентов этих двух факультетов.
+
+Студенты мужского и женского пола факультета Когтевран получили баллы выше предыдущих двух факультетов. Распределение их баллов немного разнится, с диапазоном -25-270 и пологим распредлением для девочек и диапазоном -50-220 и пиком в районе среднего балла этого факультета (\~100) для мальчиков.
+
+Распределения баллов у студентов разного пола факультета Слизерина заметно различаются. В то время, как средние остальных факультетов примерно совпадали с медианами, в этом случае эти параметры принимают два разных значения. Девушки получили самые высокие баллы среди остальных групп. Медиана их баллов \~125 баллов (за ними следуют Когтевран \~100), распределение в диапазоне 50-225 баллов с пиком в районе 120 баллов. Парни отличаются наименьшими баллами среди остальных групп. Медиана их баллов \~150 баллов (следущие по возрастанию значения у Гриффиндора и Пуффендуя \~40). Распределение в диапазоне -240-0 баллов с пиком в районе -150 баллов.
+
+Таким образом, наилучшую успеваимость имеют девочки-студенты Слизерина, за ними - студенты Когтеврана. Наименьшая успеваемость у мальчиков-студентов Слизерина.
+
+> Результат: 4.2 б.
+
+> Комментарии:
+
+| Название блока                                         | Детальное описание                                                                                                                                                                                                                                                 | Балл за блок | Наличие   | Комментарий                                                                                                    | Результат |
+|--------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|-----------|----------------------------------------------------------------------------------------------------------------|-----------|
+| Общая структура графика                                | Виолин-плот с разбиением по факультетам с выделением цветов, фасетирование по полу                                                                                                                                                                                 | 0.5          | Полностью |                                                                                                                | 0.5       |
+| Кегль шрифта                                           | Точное соответствие не требуется, ожидается, что шрифт будет достаточно крупным, и будут сохранены “ранговые соотношения” между шрифтами. Заголовок – 32, Ось Y – 29, плашки фасетов и легенда – 25, подзаголовок и метки на осях – 20. Подпись – дефолтный кегль. | 0.5          | Частично  | Подпись ощутимо большего размера, а заголовок выглядит сопоставимым с подписью оси Y                           | 0.35      |
+| Прочие настройки темы.                                 | Добавление белого фона, расположение легенды, использование курсива, цветов шрифта, выравнивание заголовка и подзаголовка по центру. Выбор шрифта Times New Roman.                                                                                                 | 0.5          | Полностью | Times New Roman здесь не критичен, подойдет любой шрифт с засечками (в т.ч. базовый serif, как в вашем случае) | 0.5       |
+| Текстовые элементы                                     | Настройка подписей осей, наличие заголовка, подзаголовка и подписи                                                                                                                                                                                                 | 0.5          | Полностью |                                                                                                                | 0.5       |
+| Цветовая гамма и метки на осях соответствуют референсу |                                                                                                                                                                                                                                                                    | 0.25         | Полностью |                                                                                                                | 0.25      |
+| Настройка подписей фасетов                             | Предполагалось использование функции labeller(). Материал выходит за рамки пройденного на лекциях.                                                                                                                                                                 | 0.25         | Полностью | .                                                                                                              | 0.25      |
+| Добавление боксплотов поверх geom_violin               |                                                                                                                                                                                                                                                                    | 0.25         | Полностью |                                                                                                                | 0.25      |
+| Средние значения                                       | Средний балл за весь год для каждого факультета без разбиения по полу. Оформление средних в виде ромба крупного размера (10) коричневого цвета с черным контуром.                                                                                                  | 0.25         | Полностью |                                                                                                                | 0.25      |
+| Горизонтальная линия                                   | Пунктир, размер (2), лососевый цвет.                                                                                                                                                                                                                               | 0.25         | Полностью |                                                                                                                | 0.25      |
+| Размер графика                                         | Точного соответствия не предполагается. Ожидается график размера большего, чем дефолтный, элементы на котором не будут выглядеть слишком мелкими. Исходный размер – 16:10                                                                                          | 0.5          | Частично  | Пропорции графика изменены, он выглядит более квадратным                                                       | 0.35      |
+| Аннотация                                              | Изогнутые стрелки со с сОлидными концами                                                                                                                                                                                                                           | 0.25         | Полностью |                                                                                                                | 0.25      |
+| Интерпретация                                          | Если кратко: когтевранцы набирают больше всех баллов, у слизеринцев бимодальное распределение. Бимодальность проявляется в полярных отметках юношей и девушек. Если написано, что как раз для таких случаев средние не очень показательны – замечательно.          | 0.5          | Полностью |                                                                                                                | 0.5       |
+
+
+> Итог: 21.65 + 0.75 = 22.4 б.
+
+> Итоговый комментарий: 
+
+Вы отлично справились! Очень классная интерпретация, аккуратное оформление кода. Вы хорошо освоили моменты, которые остались на самостоятельное изучение (patchwork, labeller, geom_curve). Из моментов, которые можно улучшить -- на первых графиках кегль шрифта был довольно миниатюрным -- увеличение точно хорошо отразится на восприятии, и график будет читаться лучше и в прямом, и в переносном смысле. за общее положительное впечатление о работе (и особенно на "раскрутку" 9-го задания) добавил бонусные 0.75 балла.
