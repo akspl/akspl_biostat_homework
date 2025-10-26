@@ -1,0 +1,115 @@
+---
+title: "ADMH"
+author: "Oksana Plastinina"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+<style type="text/css">
+body{
+  font-family: Helvetica;
+  font-size: 12pt;
+}
+/* Headers */
+h1, h2{
+  font-size: 16pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+```
+
+
+#Чтение ключевых файлов
+
+```{r}
+MH <- read_xlsx("./SDTM/MH_MEDICALHISTORY.xlsx")
+ADSL <- read_xlsx("./ADam-like/ADSL.xlsx")
+```
+
+#Сборка частей ADMH
+
+```{r}
+#Собираем информацию о пациенте в исследовании
+
+patient <- ADSL %>%
+  select(STUDYID, SUBJID, USUBJID, TRTP, TRTPN)
+```
+
+```{r}
+#Собираем данные только о пациентах с извесной медицинской историей
+
+medhistory <- MH %>% 
+  filter(MHCAT == 'Medical History' & !is.na(MHTERM)) %>% 
+  select(SUBJID, MHCAT, MHSEQ, MHTERM, MHDECOD, MHBODSYS) 
+```
+
+```{r}
+#Собираем важные даты и создаем флаги
+
+datechange <- function(vectordate) {
+ case_when(grepl('^\\d{4}$', vectordate) ~ paste0(vectordate, '-01-01'),
+           grepl('^\\d{4}-\\d{2}$', vectordate) ~ paste0(vectordate, '-01'),
+           is.na(vectordate) ~ '',
+           TRUE ~ vectordate)
+}
+
+imputflag <- function(vectordate) {
+ case_when(!grepl('^\\d{4}', vectordate) | is.na(vectordate) ~ 'Y',
+           grepl('^\\d{4}$', vectordate) ~ 'M',
+           grepl('^\\d{4}-\\d{2}$', vectordate) ~ 'D',
+           TRUE ~ '')
+}
+
+dates <- MH %>% 
+  filter(MHCAT == 'Medical History' & !is.na(MHTERM)) %>% 
+  select(SUBJID, MHSTDTC, MHENDTC, MHENRTPT, MHSEQ) %>% 
+  mutate(
+    ASTDT = format(as.Date(datechange(MHSTDTC), format = "%Y-%m-%d"), "%d.%m.%Y"),
+    ASTDTF = imputflag(MHSTDTC),
+    AENDT = case_when(
+      MHENRTPT == 'ONGOING' ~ '', 
+      TRUE ~ format(as.Date(datechange(MHENDTC), format = "%Y-%m-%d"), "%d.%m.%Y")),
+    AENDTF = imputflag(MHENDTC),
+    MHENRF = ifelse(MHENRTPT == 'ONGOING', 'ONGOING', ''))
+```
+
+
+#Собираем итоговый ADMH
+
+```{r}
+admh <- right_join(patient, medhistory) %>% 
+  left_join(dates) %>% 
+   mutate(TRTPN = as.integer(TRTPN),
+          MHSEQ = as.integer(MHSEQ),
+          MHENDTC = as.character(MHENDTC))
+```
+#Проверка наличия всех пременных и их форматов
+```{r}
+all(c('STUDYID', 'USUBJID', 'TRTP', 'TRTPN', 
+         'MHSEQ', 'MHCAT', 'MHTERM', 'MHDECOD', 'MHBODSYS', 'MHSTDTC',
+         'ASTDT', 'ASTDTF', 'MHENDTC', 'AENDT', 'AENDTF', 
+         'MHENRTPT', 'MHENRF') %in% names(admh))
+
+all(sapply(admh[c('TRTPN', 'MHSEQ')], FUN = is.integer))
+
+all(sapply(admh[c('STUDYID', 'USUBJID', 'TRTP', 
+          'MHCAT', 'MHTERM', 'MHDECOD', 'MHBODSYS', 'MHSTDTC',
+         'ASTDT', 'ASTDTF', 'MHENDTC', 'AENDT', 'AENDTF', 
+         'MHENRTPT', 'MHENRF')], FUN = is.character))
+```
+
+#Создаем конечный файл
+```{r}
+write.xlsx(admh, "./ADaM-like/admh.xlsx")
+```
+
+
+
+
