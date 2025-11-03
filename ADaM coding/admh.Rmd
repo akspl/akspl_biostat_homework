@@ -26,14 +26,14 @@ library(openxlsx)
 ```
 
 
-#Чтение ключевых файлов
+## Чтение ключевых файлов
 
 ```{r}
 MH <- read_xlsx("./SDTM/MH_MEDICALHISTORY.xlsx")
 ADSL <- read_xlsx("./ADam-like/ADSL.xlsx")
 ```
 
-#Сборка частей ADMH
+## Сборка частей ADMH
 
 ```{r}
 #Собираем информацию о пациенте в исследовании
@@ -71,7 +71,9 @@ dates <- MH %>%
   filter(MHCAT == 'Medical History' & !is.na(MHTERM)) %>% 
   select(SUBJID, MHSTDTC, MHENDTC, MHENRTPT, MHSEQ) %>% 
   mutate(
-    ASTDT = format(as.Date(datechange(MHSTDTC), format = "%Y-%m-%d"), "%d.%m.%Y"),
+    ASTDT = case_when(
+      is.na(MHSTDTC) ~ '',
+      TRUE ~ format(as.Date(datechange(MHSTDTC), format = "%Y-%m-%d"), "%d.%m.%Y")),
     ASTDTF = imputflag(MHSTDTC),
     AENDT = case_when(
       MHENRTPT == 'ONGOING' ~ '', 
@@ -80,17 +82,18 @@ dates <- MH %>%
     MHENRF = ifelse(MHENRTPT == 'ONGOING', 'ONGOING', ''))
 ```
 
-
-#Собираем итоговый ADMH
+## Собираем итоговый ADMH
 
 ```{r}
 admh <- right_join(patient, medhistory) %>% 
   left_join(dates) %>% 
    mutate(TRTPN = as.integer(TRTPN),
           MHSEQ = as.integer(MHSEQ),
-          MHENDTC = as.character(MHENDTC))
+          MHENDTC = as.character(MHENDTC)) %>% 
+  select(-SUBJID)
 ```
-#Проверка наличия всех пременных и их форматов
+
+## Проверка наличия всех пременных и их форматов
 ```{r}
 all(c('STUDYID', 'USUBJID', 'TRTP', 'TRTPN', 
          'MHSEQ', 'MHCAT', 'MHTERM', 'MHDECOD', 'MHBODSYS', 'MHSTDTC',
@@ -105,7 +108,7 @@ all(sapply(admh[c('STUDYID', 'USUBJID', 'TRTP',
          'MHENRTPT', 'MHENRF')], FUN = is.character))
 ```
 
-#Создаем конечный файл
+## Создаем конечный файл
 ```{r}
 write.xlsx(admh, "./ADaM-like/admh.xlsx")
 ```

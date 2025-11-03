@@ -11,7 +11,7 @@
 
 <meta name="author" content="Oksana Plastinina" />
 
-<meta name="date" content="2025-10-26" />
+<meta name="date" content="2025-11-03" />
 
 <title>ADMH</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">ADMH</h1>
 <h4 class="author">Oksana Plastinina</h4>
-<h4 class="date">2025-10-26</h4>
+<h4 class="date">2025-11-03</h4>
 
 </div>
 
@@ -367,10 +367,13 @@ h1, h2{
 font-size: 16pt;
 }
 </style>
-<p>#Чтение ключевых файлов</p>
+<div id="чтение-ключевых-файлов" class="section level2">
+<h2>Чтение ключевых файлов</h2>
 <pre class="r"><code>MH &lt;- read_xlsx(&quot;./SDTM/MH_MEDICALHISTORY.xlsx&quot;)
 ADSL &lt;- read_xlsx(&quot;./ADam-like/ADSL.xlsx&quot;)</code></pre>
-<p>#Сборка частей ADMH</p>
+</div>
+<div id="сборка-частей-admh" class="section level2">
+<h2>Сборка частей ADMH</h2>
 <pre class="r"><code>#Собираем информацию о пациенте в исследовании
 
 patient &lt;- ADSL %&gt;%
@@ -400,22 +403,29 @@ dates &lt;- MH %&gt;%
   filter(MHCAT == &#39;Medical History&#39; &amp; !is.na(MHTERM)) %&gt;% 
   select(SUBJID, MHSTDTC, MHENDTC, MHENRTPT, MHSEQ) %&gt;% 
   mutate(
-    ASTDT = format(as.Date(datechange(MHSTDTC), format = &quot;%Y-%m-%d&quot;), &quot;%d.%m.%Y&quot;),
+    ASTDT = case_when(
+      is.na(MHSTDTC) ~ &#39;&#39;,
+      TRUE ~ format(as.Date(datechange(MHSTDTC), format = &quot;%Y-%m-%d&quot;), &quot;%d.%m.%Y&quot;)),
     ASTDTF = imputflag(MHSTDTC),
     AENDT = case_when(
       MHENRTPT == &#39;ONGOING&#39; ~ &#39;&#39;, 
       TRUE ~ format(as.Date(datechange(MHENDTC), format = &quot;%Y-%m-%d&quot;), &quot;%d.%m.%Y&quot;)),
     AENDTF = imputflag(MHENDTC),
     MHENRF = ifelse(MHENRTPT == &#39;ONGOING&#39;, &#39;ONGOING&#39;, &#39;&#39;))</code></pre>
-<p>#Собираем итоговый ADMH</p>
+</div>
+<div id="собираем-итоговый-admh" class="section level2">
+<h2>Собираем итоговый ADMH</h2>
 <pre class="r"><code>admh &lt;- right_join(patient, medhistory) %&gt;% 
   left_join(dates) %&gt;% 
    mutate(TRTPN = as.integer(TRTPN),
           MHSEQ = as.integer(MHSEQ),
-          MHENDTC = as.character(MHENDTC))</code></pre>
+          MHENDTC = as.character(MHENDTC)) %&gt;% 
+  select(-SUBJID)</code></pre>
 <pre><code>## Joining with `by = join_by(SUBJID)`
 ## Joining with `by = join_by(SUBJID, MHSEQ)`</code></pre>
-<p>#Проверка наличия всех пременных и их форматов</p>
+</div>
+<div id="проверка-наличия-всех-пременных-и-их-форматов" class="section level2">
+<h2>Проверка наличия всех пременных и их форматов</h2>
 <pre class="r"><code>all(c(&#39;STUDYID&#39;, &#39;USUBJID&#39;, &#39;TRTP&#39;, &#39;TRTPN&#39;, 
          &#39;MHSEQ&#39;, &#39;MHCAT&#39;, &#39;MHTERM&#39;, &#39;MHDECOD&#39;, &#39;MHBODSYS&#39;, &#39;MHSTDTC&#39;,
          &#39;ASTDT&#39;, &#39;ASTDTF&#39;, &#39;MHENDTC&#39;, &#39;AENDT&#39;, &#39;AENDTF&#39;, 
@@ -428,8 +438,11 @@ dates &lt;- MH %&gt;%
          &#39;ASTDT&#39;, &#39;ASTDTF&#39;, &#39;MHENDTC&#39;, &#39;AENDT&#39;, &#39;AENDTF&#39;, 
          &#39;MHENRTPT&#39;, &#39;MHENRF&#39;)], FUN = is.character))</code></pre>
 <pre><code>## [1] TRUE</code></pre>
-<p>#Создаем конечный файл</p>
+</div>
+<div id="создаем-конечный-файл" class="section level2">
+<h2>Создаем конечный файл</h2>
 <pre class="r"><code>write.xlsx(admh, &quot;./ADaM-like/admh.xlsx&quot;)</code></pre>
+</div>
 
 
 
