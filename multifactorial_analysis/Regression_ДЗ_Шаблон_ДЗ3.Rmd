@@ -23,12 +23,21 @@ library(ggmosaic)
 library(flextable)
 library(ggResidpanel)
 library(ggfortify)
+library(GGally)
+library(lmtest)
 ```
 
 ```{r}
 data <- read_excel("data/raw/HW_data.xlsx")
 dictionary <- read_excel("data/raw/HW_dictionary.xlsx")
 ```
+
+```{r}
+data <- data %>% 
+  mutate(cigar_col = case_when(cigar == 0 ~ NA,
+                               TRUE ~ cigar))
+```
+
 
 ```{r}
 thememine <- theme(
@@ -40,6 +49,10 @@ thememine <- theme(
 )
 
 theme_set(thememine)
+```
+
+```{r}
+tobaccolabels <- c('0' = 'Не курит', '1' = 'Курит')
 ```
 
 ```{r echo=FALSE}
@@ -248,204 +261,7 @@ DAG2
 
 ## **Описательная статистика и эксплораторный анализ**
 
-```{r}
-variable_dict <- setNames(dictionary$label, dictionary$variable)
 
-categorical_table <- data %>%
-  select(labor, tobacco, alcohol, medrisk, death, mrace3, dmeduc3, adequacy, delmeth, csex, drink) %>%
-  mutate(across(c(labor, tobacco, alcohol, medrisk, death), 
-                ~factor(., levels = c("0", "1"), labels = c("No", "Yes")))) %>%
-  rename_with(~ variable_dict[.x], .cols = any_of(names(variable_dict))) %>% 
-  tbl_summary(
-    type = all_categorical() ~ "categorical",
-    statistic = all_categorical() ~ "{n} ({p}%)",
-    missing_text = "Missing"
-  ) %>%
-  modify_header(label = "**Категориальные переменные**") %>%
-  modify_caption("**Таблица 1A. Категориальные переменные**")
-
-continuous_table <- data %>%
-  select(dmage, dbirwt, dtotord, dmeduc, monpre, nprevist, gestat, cigar) %>%
-  rename_with(~ variable_dict[.x], .cols = any_of(names(variable_dict))) %>% 
-  tbl_summary(
-    type = all_continuous() ~ "continuous2",
-    statistic = all_continuous() ~ c("{mean} ({sd})", "{median}", "{min}, {max}"),
-    digits = all_continuous() ~ 2,
-    missing_text = "Missing"
-  ) %>%
-  modify_header(
-    label = "**Числовые переменные**",
-    stat_0_1 = "**Mean (SD)**",
-    stat_0_2 = "**Median**", 
-    stat_0_3 = "**Min, Max**"
-  ) %>%
-  modify_caption("**Таблица 1B. Числовые переменные**")
-
-
-```
-
-```{r}
-plot_continuous_dist <- function(data, var, var_name, color) {
-  ggplot(data, aes(x = {{var}})) +
-    geom_histogram(bins = 20, fill = color, alpha = 0.7, color = "white") +
-    geom_vline(aes(xintercept = median({{var}}, na.rm = TRUE)), 
-               color = "red", linetype = "dashed", size = 1) +
-    labs(title = paste("Распределение:", var_name),
-         x = var_name, y = "Частота") +
-    theme_minimal() +
-    theme(plot.title = element_text(size = 11))
-}
-
-plot_boxplot <- function(data, var, var_name, color) {
-  ggplot(data, aes(y = {{var}})) +
-    geom_boxplot(fill = color, alpha = 0.7, outlier.color = "red", outlier.size = 2) +
-    labs(title = paste("Выбросы:", var_name),
-         y = var_name) +
-    theme_minimal() +
-    theme(plot.title = element_text(size = 11))
-}
-
-plot_categorical <- function(data, var, var_name, color) {
-  data %>%
-    count({{var}}) %>%
-    mutate(prop = n/sum(n),
-           category = as.character({{var}})) %>%
-    ggplot(aes(x = reorder(category, prop), y = prop)) +
-    geom_col(fill = color) +
-    coord_flip() +
-    labs(title = paste("Распределение:", var_name),
-         x = "", y = "Доля") +
-    scale_y_continuous(labels = scales::percent) +
-    theme_minimal() +
-    theme(plot.title = element_text(size = 11))
-  
-  
-}
-
-plot_by_smoking <- function(data, var, var_name, color_palette = c("lightgreen", "coral")) {
-  ggplot(data, aes(x = factor(tobacco), y = {{var}}, fill = factor(tobacco))) +
-    geom_boxplot(alpha = 0.7) +
-    labs(title = paste(var_name, "по статусу курения"),
-         x = "Курение во время беременности", 
-         y = var_name) +
-    scale_x_discrete(labels = c("Не курит", "Курит")) +
-    scale_fill_manual(values = color_palette, guide = "none") +
-    theme_minimal() +
-    theme(plot.title = element_text(size = 11))
-
-}
-
-p1 <- plot_continuous_dist(data, dbirwt, "Вес при рождении", "steelblue")
-p2 <- plot_boxplot(data, dbirwt, "Вес при рождении", "lightblue")
-p3 <- plot_continuous_dist(data, dmage, "Возраст матери", "darkgreen")
-p4 <- plot_boxplot(data, dmage, "Возраст матери", "lightgreen")
-
-(p1 + p2) / (p3 + p4) +
-  plot_annotation(title = "Эксплораторный анализ: непрерывные переменные",
-                  theme = theme(plot.title = element_text(size = 16, face = "bold")))
-
-```
-
-```{r fig.width=18, fig.height=10}
-  categorical_plots <- (
-    plot_categorical(data, tobacco, "Курение", "brown") +
-    plot_categorical(data, dmeduc3, "Образование", "pink") +
-    plot_categorical(data, mrace3, "Раса", "coral") +
-    plot_categorical(data, adequacy, "Пренат. уход", "lightblue") +
-    plot_categorical(data, alcohol, "Алкоголь", "darkblue") +
-    plot_categorical(data, labor, "Осложнения", "darkgreen")
-  ) + plot_layout(nrow=2, ncol = 3)
-
-
-categorical_plots
-```
-
-
-```{r}
-p5 <- plot_by_smoking(data, dbirwt, "Вес при рождении")
-p6 <- plot_by_smoking(data, dmage, "Возраст матери")
-
-p7 <- data %>%
-  ggplot() +
-  geom_mosaic(aes(x = product(tobacco), fill = labor))+
-  labs(title = "Статус осложнений по статусу курения",
-       x = "Курение", y = "Осложнение") +
-  scale_fill_viridis_d() +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 11))
-
-p8 <- data %>%
-  ggplot() +
-  geom_mosaic(aes(x = product(tobacco), fill = adequacy)) +
-  labs(title = "Пренатальный уход  по статусу курения",
-       x = "Курение", y = "Уход") +
-  scale_fill_viridis_d() +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 11))
-
-(p5 + p6) / (p7 + p8) +
-  plot_annotation(title = "Сравнение характеристик по статусу курения",
-                  theme = theme(plot.title = element_text(size = 16, face = "bold")))
-
-```
-
-```{r}
-additionaltable_cath <- data %>% 
-  select(death, congenit, newborn) %>% 
-  mutate(across(c(death, congenit, newborn), 
-                ~factor(., levels = c("0", "1"), labels = c("No", "Yes")))) %>%
-  rename_with(~ variable_dict[.x], .cols = any_of(names(variable_dict))) %>% 
-  tbl_summary(
-    type = all_categorical() ~ "categorical",
-    statistic = all_categorical() ~ "{n} ({p}%)",
-    missing_text = "Missing"
-  ) %>%
-  modify_header(label = "**Категориальные переменные**") %>%
-  modify_caption("**Таблица 2A. Дополнительные конечные точки: Категориальные переменные**")
-
-
-
-
-additionaltable_col <- data %>% 
-  select(gestat) %>%
-  rename_with(~ variable_dict[.x], .cols = any_of(names(variable_dict))) %>% 
-  tbl_summary(
-    type = all_continuous() ~ "continuous2",
-    statistic = all_continuous() ~ c("{mean} ({sd})", "{median}", "{min}, {max}"),
-    digits = all_continuous() ~ 2,
-    missing_text = "Missing"
-  ) %>%
-  modify_header(
-    label = "**Числовые переменные**",
-    stat_0_1 = "**Mean (SD)**",
-    stat_0_2 = "**Median**", 
-    stat_0_3 = "**Min, Max**"
-  ) %>%
-  modify_caption("**Таблица 2B. Дополнительные конечные точки: Числовые переменные**")
-
-additionaltable_cath
-additionaltable_col
-```
-
-
-```{r fig.height=5, fig.width=12}
-p9 <- plot_by_smoking(data, gestat, "Количество недель беременности")
-
-p10 <- data %>% 
-    mutate(across(c(tobacco, newborn), 
-                ~factor(., levels = c("0", "1"), labels = c("No", "Yes")))) %>% 
-  ggplot()+
-  geom_mosaic(aes(x = product(tobacco), fill = newborn))+
-  labs(title = "Статус наличия ненормальных состояний при рождении",
-       x = "Курение", y = "Наличие ненормальных состояний") +
-  scale_fill_viridis_d() +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 11))
-
-(p9 + p10) +
-  plot_annotation(title = "Сравнение характеристик по статусу курения",
-                  theme = theme(plot.title = element_text(size = 16, face = "bold")))
-```
 
 
 ## **Результаты эксплораторного анализа конечной точки 1**
@@ -458,52 +274,148 @@ p10 <- data %>%
 
 Размер стандартного отклонения (около 17% от среднего значения) указывает на умеренную вариабельность веса при рождении в изучаемой популяции, что является типичным для данного антропометрического показателя.
 
+
 ## Результаты анализа конечной точки 1
 
+В нашем исследовании подавляющее число пациенток не курило во время беременности, из-за чего в распределнии среднего числа выкуренных сигарет в день наблюдается пик в области 0 значений. Из-за такого характера данных взаимосвязь веса ребенка и количественной переменной среднего числа сигарет в день имеет нелинейный характер (см. Взаимосвязь веса реебнка при рождении и среднего числа выкуренных матерью сигарет в день). В связи с этим эффект влияния курения матери во время беременности на вес ребенка при рождении оценивали двумя путями: 1) определяли влияния статуса курения на вес с использованием бинарной переменной статуса курения; 2) определяли дозозависимый эффект числа сигарет на вес ребенка при рождении и с использованим количественной переменной числа выкуренных при беременности сигарет среди курильщиков (см. распределее среднего числа выкуренных сигарет в день среди курящих пациентов и ).
 
-```{r}
-fit1 <- lm(data$dbirwt ~ data$cigar, data)
-
-fit1
+```{r fig.height=5, fig.width=8}
+data %>% 
+  ggplot(aes(x = cigar, y = dbirwt))+
+  geom_jitter()+
+  geom_smooth(se = FALSE, method = 'lm')+
+  labs(
+    title = 'Взаимосвязь веса реебнка при рождении и \nсреднего числа выкуренных матерью сигарет в день',
+    x = 'Число сигарет',
+    y = 'Вес ребенка при рождении, г'
+  )
+  
 ```
 
-При построении графика зависимости остатков от значений, предскасказанных на основе линейной модели без учета смешивающих факторов, наблюдается нарушение усливий линейной регресиии: нелинейный разброс остатков относительно 0, их разброс увеличивается с ростом предсказанных значений, после границы веса ребенка в 3200 г модель системалически завышает предсказанные значения (Приложение 3А). 
+```{r fig.height=5, fig.width=8}
+data %>% 
+  ggplot()+
+  geom_histogram(aes(x = cigar_col), fill = 'seagreen', colour = 'black')+
+  labs (
+    title = 'Распределение среднего числа выкуренных сигарет в день \nсреди курящих пациентов',
+    x = 'Количество сигарет',
+    y = 'Количество пациентов'
+  )+
+  scale_x_continuous(breaks = seq(0,30, 5))+
+  scale_y_continuous(breaks = seq(0,40, 5))
 
-
-Для линеризации взаимосвязи проведем логарифмирование перменной cigar.
-
-```{r}
-fit11 <- lm(data$dbirwt ~ log(data$cigar+1), data)
-fit11
 ```
 
-Логарифмирование позволило линеризовать и уменьшить разброс остатков до диапазона -2000 - 1000 (Приложение 3Б). Данные все ещё сильно вариабельны, наибольший разброс остатков сконцентрирован при предсказании значений в районей 3400.
-
-Исходя из графиков диагностики модели (Прилоджение 3В) можно сделать следующие выводы: 
-1) остски распредлены ненормально, наблюдаются значительные отклонения в распределении их нижней области 
-2) стандартные ошибки распределены примерно равномерно
-3) влиятельных наблюдений не наблюдается, все точки находятся внутри линий расстояний Кука.
-
-Согласно данной модели, средний вес новорожденного у неккрящий матерей 3409 г. 
-
-```{r}
-fit2 <- lm(data$dbirwt ~ data$cigar + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
-
-fit2
+```{r fig.height=5, fig.width=8}
+data %>% 
+  ggplot(aes(x = cigar_col, y = dbirwt))+
+  geom_jitter()+
+  geom_smooth(se = FALSE, method = 'lm')+
+  labs(
+    title = 'Взаимосвязь веса реебнка при рождении и \nсреднего числа выкуренных матерью сигарет в день среди курильщиков',
+    x = 'Число сигарет',
+    y = 'Вес ребенка при рождении, г'
+  )+
+  scale_x_continuous(breaks = seq(0,30, 5))
 ```
 
-Построение линейной модели с учетом смешивающих факторов позволяет исключить нелинейный разброс остатков относительно 0 (см. график зависимости остатков от предсказанных значений из приложения 4)
 
-Исходя из графков диагностики линейной модели (Приложение 3Б) можно сделать слеующие выводы:
+### Модель зависимости веса ребенка при рождении от курения матери без смешивающих факторов
 
-1) График Residuals vs Fitted строит горизонтальную прямую, свидетельствующую о линйеной взаимосвязи пременных.
+#### Диагностика зависимости веса ребенка от статуса курения матери
 
-2) график Scale-location имеет горизонтальную линию с некоторым отклоением с области значений больишх 3300
+Для диагностики зависимости веса ребека от статуса курения матери во время беременности использовали линейную регрессию без поправки на смешивающие факторы. Диагностика модели показала гомоскедастичность остатков, но их ненормальное распределение в области < -2 sd (приложение 3А). В связи с этим при оценке р-значения и ДИ использовали скорректированные стандартные ошибки. 
 
-2) QQ-plot свидетельствует о ненормальности распределения остатков.
+```{r}
+fit10 <- lm(data$dbirwt ~ data$tobacco, data)
+
+coeftest(fit10, vcov. = vcovHC, conf.int = TRUE) %>% broom::tidy()
+
+```
+
+Cогласно линейной регрессии расчитанной по методу наименьших квадратов без поправки на смешающие факторы средний вес ребенка при рождении у некурящей матри равен 3408 гр (95% ДИ [3354; 3461]), куруние матери в среднем приводит к снижению веса реебнка при рождении на 228 гр (95% ДИ [-350; -105]).
+
+#### Определение дозозависимого эффекта курения матери
+
+Для определения дозозависимого эффекта курения матери во время беременности на вес ребенка использовали линейную регрессию без поправки на смешивающие факторы. Диагностика модели показала линейное распределение остатков относительно 0, отсутвие влиятельных наблюдений, но ненормальное распределение остатков в областях +/- 1,5 sd и гомоскедастичность остатков (Приложение 3Б). В связи с этим при оценке р-значения и ДИ использовали скорректированные стандартные ошибки. 
+
+```{r}
+fit11 <- lm(data$dbirwt ~ data$cigar_col, data)
+
+coeftest(fit11, vcov. = vcovHC, conf.int = TRUE) %>% broom::tidy()
+
+```
+
+Cогласно линейной регрессии расчитанной по методу наименьших квадратов без поправки на смешающие факторы средний вес ребенка при рождении у некурящей матерей равен 3309 гр (95% ДИ [3309; 3543]), каждая выкуренная сигарета снижает вес ребенка при рождении на 9.68 гр (95% ДИ [-23.85; -4.48]).
+
+### Модель зависимости веса ребенка при рождении от курения матери с учетом смешивающих факторов
+
+#### Модель зависимости веса ребенка при рождении от курения матери с учетом смешивающих факторов
+
+Для диагностики зависимости веса ребека от статуса курения матери во время беременности использовали линейную регрессию с учетом следующих смешивающих факторов: количество выпитых в течение беременности спиртных напитков, возраст матери, наличие медицинских рисков, раса матери, качество пренатального ухода, образование матери.
+Диагностика модели показала линейное распределение остатков относительно 0, отсутвие влиятельных наблюдений, но ненормальное распределение остатков в областях <-2 sd и гомоскедастичность остатков (Приложение 4А). В связи с этим при оценке р-значения и ДИ использовали скорректированные стандартные ошибки. 
+
+```{r}
+fit20 <- lm(data$dbirwt ~ data$tobacco + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+
+coeftest(fit20, vcov. = vcovHC, conf.int = TRUE) %>% broom::tidy()
+```
+
+Cогласно линейной регрессии рассчитанной по методу наименьших квадратов с поправкой на смешающие факторы средний вес ребенка при рождении у некурящих матерей равен 3287 гр (95% ДИ [2965; 3609]), куруние матери в среднем приводит к снижению веса ребенка при рождении на 185 гр (95% ДИ [-310; -60]).
+
+#### Определение дозозависимого эффекта курения матери
+
+Для определения дозозависимого эффекта курения матери во время беременности на вес ребенка использовали линейную регрессию с учетом следующих смешивающих факторов: количество выпитых в течение беременности спиртных напитков, возраст матери, наличие медицинских рисков, раса матери, качество пренатального ухода, образование матери.
+
+```{r}
+fit21 <- lm(data$dbirwt ~ data$cigar_col + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+```
+
+Диагностика модели показала нелинейное распределение остатков относительно 0, отсутвие влиятельных наблюдений, ненормальное распределение остатков в областях > 1,5 sd и гетероскедастичность (Приложение 4Б). 
+
+Детальное рассмотрение распределения остатков у количественных переменных модели определило, что вклад в нелинейность вносят обе переменные (количество сигарет и возраст) (Приложение 4В). 
+
+Преобразование модели путем логарифмирования веса ребенка (Приложение 4Г) и категоризация переменной возраста (Приложение 4Д) после рождения не позволило линеризовать распределение остатков.
+
+### Определение влияния этноса матери на полный каузальный эффект курения на вес ребенка при рождении
+
+Для оценки  влияния возраста этноса матери на полный каузальный эффект курения на вес ребенка при рождении построили две модели c учетом и без учета взаимодействия статуса курения и возраста матери. Остатки обеих моделей распределены гомоскедастично. Для определения влияния возраста матери на полный каузальный эффект курения на вес ребенка при рождении использовали anova. 
+
+Согласно резульататом anova влияние этноса матери не оказывает статистически значимое влияния (по уровню значимости 0,05, p-значение = 0.1127) на полный каузальный эффект курения на вес ребенка при рождении. 
 
 
-Согласно данной модели средний вес ребенка у некурящих матерей 3274 г, а выкуривание одной сигареты связано с уменьшением веса ребенка на 13.5 г.
+```{r}
+fit20 <- lm(data$dbirwt ~ data$tobacco + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+
+fit30 <- lm(data$dbirwt ~ data$tobacco*data$mrace3 + data$drink + data$dmage + data$medrisk + data$adequacy + data$dmeduc3, data)
+
+autoplot(fit30)
+```
+
+```{r}
+anova(fit20, fit30)
+```
+
+
+### Определение влияния возраста матери на полный каузальный эффект курения на вес ребенка при рождении
+
+Для оценки  влияния возраста матери на полный каузальный эффект курения на вес ребенка при рождении построили две модели c учетом и без учета взаимодействия статуса курения и возраста матери. Остатки обеих моделей распределены гомоскедастично. Для определения влияния возраста матери на полный каузальный эффект курения на вес ребенка при рождении использовали anova. 
+
+Согласно резульататом anova возраст матери не оказывает значимое влияния на полный каузальный эффект курения на вес ребенка при рождении. 
+
+```{r}
+fit20 <- lm(data$dbirwt ~ data$tobacco + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+
+fit40 <- lm(data$dbirwt ~ data$tobacco*data$dmage + data$drink + data$medrisk + data$adequacy + data$dmeduc3 + data$mrace3, data)
+
+autoplot(fit40)
+```
+```{r}
+anova(fit20, fit40)
+```
+
+
+
 
 ## **Результаты эксплораторного анализа конечной точки 2**
 
@@ -577,25 +489,54 @@ continuous_table
 
 ## **Приложение 3А**
 
-```{r}
-resid_panel(fit1, plots = "resid", smoother = TRUE)
+Диагностика зависимости веса ребека от статуса курения матери во время беременности использовали линейную регрессию без поправки на смешивающие факторы
+
+```{r fig.height=3, fig.width=9}
+autoplot(fit10, c(1,2))
 ```
 
 ## **Приложение 3Б**
 ```{r}
-resid_panel(fit11, plots = "resid", smoother = TRUE)
-```
-
-## **Приложение 3В**
-```{r}
 autoplot(fit11)
 ```
 
-## **Приложение 4**
+## **Приложение 4А**
 
 ```{r}
-resid_panel(fit2, plots = "resid", smoother = TRUE)
+autoplot(fit20)
 ```
+
+## **Приложение 4Б**
+
+```{r}
+autoplot(fit21)
+```
+
+## **Приложение 4В**
+
+```{r}
+resid_xpanel(fit21, smoother = TRUE)
+```
+
+
+## **Приложение 4Г**
+
+```{r}
+fit22 <- lm(log(data$dbirwt) ~ data$cigar_col + data$drink + data$dmage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+
+autoplot(fit22)
+```
+
+## **Приложение 4Д**
+
+```{r}
+catage <- cut(data$dmage, breaks = c(0,20,25,30,35,100))
+
+fit23 <- lm(data$dbirwt ~ data$cigar_col + data$drink + catage + data$medrisk + data$adequacy + data$mrace3 + data$dmeduc3, data)
+
+autoplot(fit23)
+```
+
 
 ## **Приложение 5**
 ```{r}
