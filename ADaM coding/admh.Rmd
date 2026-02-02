@@ -1,8 +1,12 @@
 ---
-title: "ADMH"
+title: "Сборка датасета с анамнезом субъектов ADMH на основе ADSL и домена MH"
 author: "Oksana Plastinina"
-date: "`r Sys.Date()`"
-output: html_document
+date: "2025-11-03"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
 ---
 
 <style type="text/css">
@@ -19,21 +23,28 @@ h1, h2{
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-
 library(tidyverse)
 library(readxl)
 library(openxlsx)
 ```
 
+<br>
 
-## Чтение ключевых файлов
+папка ADaM-like - содержит в себе итоговый файл ADMH;
+
+папка SDTM - база данных в виде SDTM, которые используются для сборки датасетов;
+
+папка Specs - содержит спецификацию;
+
+
+## **Чтение ключевых файлов**
 
 ```{r}
 MH <- read_xlsx("./SDTM/MH_MEDICALHISTORY.xlsx")
 ADSL <- read_xlsx("./ADam-like/ADSL.xlsx")
 ```
 
-## Сборка частей ADMH
+## **Сборка частей ADMH**
 
 ```{r}
 #Собираем информацию о пациенте в исследовании
@@ -47,7 +58,7 @@ patient <- ADSL %>%
 
 medhistory <- MH %>% 
   filter(MHCAT == 'Medical History' & !is.na(MHTERM)) %>% 
-  select(SUBJID, MHCAT, MHSEQ, MHTERM, MHDECOD, MHBODSYS) 
+  select(SUBJID, MHSEQ, MHCAT, MHTERM, MHDECOD, MHBODSYS) 
 ```
 
 ```{r}
@@ -82,19 +93,25 @@ dates <- MH %>%
     MHENRF = ifelse(MHENRTPT == 'ONGOING', 'ONGOING', ''))
 ```
 
-## Собираем итоговый ADMH
+## **Собираем итоговый ADMH**
 
 ```{r}
+
 admh <- right_join(patient, medhistory) %>% 
   left_join(dates) %>% 
+  #корректируем формат некоторых переменных
    mutate(TRTPN = as.integer(TRTPN),
           MHSEQ = as.integer(MHSEQ),
           MHENDTC = as.character(MHENDTC)) %>% 
-  select(-SUBJID)
+  #упорядочиваем согласно спецификации
+  select(STUDYID, USUBJID, TRTP, TRTPN, MHSEQ, MHCAT, MHTERM, MHDECOD, MHBODSYS, MHSTDTC, ASTDT, ASTDTF, MHENDTC, AENDT, AENDTF, MHENRTPT, MHENRF)
+
 ```
 
-## Проверка наличия всех пременных и их форматов
+## **Проверка наличия всех пременных и их форматов**
+
 ```{r}
+
 all(c('STUDYID', 'USUBJID', 'TRTP', 'TRTPN', 
          'MHSEQ', 'MHCAT', 'MHTERM', 'MHDECOD', 'MHBODSYS', 'MHSTDTC',
          'ASTDT', 'ASTDTF', 'MHENDTC', 'AENDT', 'AENDTF', 
@@ -108,7 +125,8 @@ all(sapply(admh[c('STUDYID', 'USUBJID', 'TRTP',
          'MHENRTPT', 'MHENRF')], FUN = is.character))
 ```
 
-## Создаем конечный файл
+## **Создаем конечный файл**
+
 ```{r}
 write.xlsx(admh, "./ADaM-like/admh.xlsx")
 ```
