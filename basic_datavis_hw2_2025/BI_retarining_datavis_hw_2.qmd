@@ -1,19 +1,24 @@
 ---
-title: "BI_retarining_datavis_hw_2"
+title: "Базовая визуализация данных в R. Часть 2"
 author: "Oksana Plastinina"
 format:
   html:
+    code-fold: true
+    toc: true
+    toc_float: true
     embed-resources: true
 editor: visual
 ---
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 library(tidyverse)
 library(treemapify)
 library(ggimage)
 library(patchwork)
 library(ggsignif)
+```
 
+```{r message=FALSE}
 hogwarts <- read_csv("data/hogwarts_2025.csv")
 ```
 
@@ -44,7 +49,7 @@ bloodStatus_labels <- c(
       "pure-blood" = "Чистокровка")
 ```
 
-## 1
+## 1. Практика использования пакета ggsignif
 
 При выполнении задания использовался пакет ggsignif. Расширение представляет собой простой способ определения и визуализации статистической значимости различий двух групп. На графике это отображается с помощью скобок, соединяющих интересующие группы с указание значения уровня статистической значимости (в числовой или иной форме).
 
@@ -127,7 +132,7 @@ hogwarts %>%
   )
 ```
 
-## 2
+## 2. Визуализация распределения с помощью графика Treemap
 
 Treemap позволяет отобразить иерархию категориальной переменной. Здесь площадь каждого прямоугольника пропорцианально соответсвует доли этого варианта признака относительно всей выборки.
 
@@ -160,7 +165,7 @@ hogwarts %>%
     legend.text = element_text( size = 13))
 ```
 
-## 3
+## 3. Практика визуализации распределения с помощью графика lollipop-plot
 
 ```{r fig.width=8, fig.height=12}
 
@@ -192,7 +197,8 @@ hogwarts %>%
 
 ```
 
-## 4
+
+## 4. Визуализация распределения из пункта №5 верным способом
 
 Неверные стороны интерпретации данных:
 
@@ -265,17 +271,18 @@ meanweek_h %>%
 
 ```
 
-## 5
+
+## 5. Визуализация распределния неверным, но многогранным способом
 
 ```{r}
-podkazka <- read.csv("data/podskazka2.csv")
-
-podkazka %>% 
-  ggplot()+
-  geom_point(aes(x = X, y = Y))
+# podkazka <- read.csv("data/podskazka2.csv")
+# 
+# podkazka %>% 
+#   ggplot()+
+#   geom_point(aes(x = X, y = Y))
 ```
 
-```{r fig.width=8, fig.height=25}
+```{r fig.width=8, fig.height=25, warning=FALSE}
 
 task2_4 <- meanweek_h %>% 
   rename(ms = `Среднее`) %>% 
@@ -338,11 +345,9 @@ task2_4 <- meanweek_h %>%
    ) 
 
 ggbackground (task2_4, background = "images/fire_bear_2.png")
-
-
 ```
 
-## 6
+## 6. Конвеер для создания графика с разным цветом стобиков
 
 ```{r fig.width=16, fig.height=10}
 #генерация вектора с цветами
@@ -358,13 +363,13 @@ histograms_res <- function(n_colour) {
   ggplot()+
   geom_histogram(aes(x = result), fill = n_colour, colour = 'black', bins = 20)+
   labs(
-    x = 'балл',
-    y = 'ученик'
+    x = 'Количество баллов',
+    y = 'Количество учеников'
   )+
     scale_x_continuous(breaks = seq(-250,300,100))+
     theme(
-      axis.text = element_text(size = 9, colour = 'grey20'),
-      axis.title = element_text(colour = 'black', size = 12)
+      axis.text = element_text(size = 12, colour = 'grey20'),
+      axis.title = element_text(colour = 'black', size = 23)
     )
 }
   
@@ -372,7 +377,8 @@ histograms_res_colour <- map(res_colours,
                              \(n_colour) histograms_res(n_colour) ) 
 
 wrap_plots(histograms_res_colour)+
-    plot_annotation(
+  plot_layout(axis_titles = "collect")+
+  plot_annotation(
     title = "Раcпределение итоговых отметок учеников",
     theme = theme(plot.title = element_text(hjust = 0.5, size = 30)))
 ```
