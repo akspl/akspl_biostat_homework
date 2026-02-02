@@ -51,7 +51,7 @@ thememine <- theme(
 theme_set(thememine)
 ```
 
-Вам предстоит работать с датасетом - листом ожидания трансплантации почки.
+В рамках задания работа проводилас с датасетом - листом ожидания трансплантации почки.
 
 <br>
 
@@ -108,7 +108,7 @@ data <-  data %>%
 
 База данных представляет собой лист ожидания трансплантации почки. Содержит информацию о 5888 пациентах (после удаления некорректных наблюдений) по следующим переменным:
 
-- **id** - id пациента
+  - **id** - id пациента
   - **sex** - пол
   - **BirthD** - дата рождения
   - **age** - возраст в годах на момент включения в лист ожидания
@@ -135,25 +135,33 @@ data %>%
       Status_max_numeric == 1 ~ 'Transplantation'
     ),
     Status_max_numeric = as.factor(Status_max_numeric),
-    # diab = factor(data$diab, levels = c('0', '1'), labels = c('No', 'Yes'))
+    diab = case_when(
+      diab == "0" ~ 'No ',
+      diab == "1" ~ 'Yes ',
+      TRUE ~ diab
+    ) %>% as.factor()
   ) %>% 
   tbl_summary(
     by = Status_max_numeric,
     type = all_continuous() ~ "categorical",
     statistic = all_categorical() ~ "{n} ({p}%)",
     include = everything(),
-    # label = list(
-    #   sex ~ 'Пол',
-    #   Bl_gr ~ 'Группа крови',
-    #   Rhesus ~ 'Резус-фактор',
-    #   Centre ~ 'id центра',
-    #   Level ~ 'уровень центра',
-    #   Status_0 ~ 'статус на момент включения в лист ожидания', 
-    #   Status_max ~ 'статус на момент окончания наблюдения',
-    #   diab ~ 'статус диабета'
-    # )
+    label = list(
+      Bl_gr ~ 'blood group',
+      Level ~ 'centre level',
+      Status_0 ~ 'initial status',
+      Status_max ~ 'status at the end of monitoring',
+      diab ~ 'diabetes status'
+    )
     )%>% 
-  add_overall()
+  add_overall() %>% 
+  as_flex_table() %>% 
+  theme_box() %>% 
+  bg(part = "header", bg = "cornsilk") %>%
+  bg(i = c(1,5,10,14,28,31,34,39), bg = "grey90", part = "body") %>%
+  merge_h_range(i = c(1,5,10,14,28,31,34,39), j1 = 1, j2 = 4, part = "body") %>%
+  align(part = 'all', align = 'center') %>% 
+  set_table_properties(layout = 'autofit', width = 0.8)
 ```
 
 
@@ -293,7 +301,7 @@ flextable(dfq1) %>%
 ```{r}
 timem <- c(30)
 
-df <- data.frame(
+df <- tibble(
   'Время наблюдения, дни' = timem,
   'Вероятность трансплантации' = ((1- summary(fit1, timem)$surv)*100) %>% round(1) ,
   "Нижняя граница ДИ" = ((1 - summary(fit1, timem)$upper)*100) %>% round(1),
@@ -387,40 +395,62 @@ q2 <-  q2 %>% as.data.frame()
 q2 %>% 
   mutate(
     strata = rownames(q2)) %>%
-  pivot_longer(!strata, names_to = 'Параметр', values_to = 'Значение') %>% 
-  as_grouped_data(groups = 'strata') %>% 
+  pivot_longer(
+    cols = -strata,
+    names_to = c(".value", "% пациентов"),
+    names_sep = "\\."
+  ) %>%
+  rename( 'Время наблюдения' = 'quantile',
+          'Нижняя граница ДИ' = 'lower',
+          'Верхняя граница ДИ' = 'upper',
+          'Статус' = 'strata') %>% 
+  mutate(
+    Статус = case_when(
+      Статус == 'diab=0' ~ 'Нет диабета',
+      Статус == 'diab=1' ~ 'Есть диабет',
+      TRUE ~ Статус
+    )
+  ) %>% 
+  as_grouped_data(groups = 'Статус') %>% 
   as_flextable() %>% 
   theme_box() %>% 
   bg(part = "header", bg = "cornsilk") %>%
-  bg(i = ~ !is.na(strata), bg = "grey90", part = "body") %>%
+  bg(i = ~ !is.na(Статус), bg = "grey90", part = "body") %>%
   align(part = 'all', align = 'center') %>% 
   set_table_properties(layout = 'autofit', width = 1) %>% 
-  set_caption('Таблица - Характеристика вероятнотей трансплантации во времени')
+  set_caption('Характеристика вероятнотей трансплантации во времени')
   
 
 ```
 
-Медианы времени до трансплантации у двух различаются 50% пациентов с диабетом получили почку к 231 дню (ДИ [211, 257]), пациенты без диабета позже - к 359 дню (ДИ [334, 390]).
+Медианы времени до трансплантации у двух групп различаются: 50% пациентов с диабетом получили почку к 231 дню (ДИ [211, 257]), пациенты без диабета позже - к 359 дню (ДИ [334, 390]).
 90% пациентов с диабетом получили почку к 1584 дню (ДИ [1353, 1960]), пациенты без диабета позже - к 2282 дню (ДИ [2040, 2412])
 
 ```{r}
 timem <- c(30)
 
-df <- data.frame(
+df <- tibble(
   'Время наблюдения' = timem,
   strata = summary(fit, timem)$strata,
-  "Вероятность трнасплантации" = ((1- summary(fit, timem)$surv)*100) %>% round(1),
+  "Вероятность трансплантации" = ((1- summary(fit, timem)$surv)*100) %>% round(1),
   "Нижняя граница ДИ" = ((1 - summary(fit, timem)$upper)*100) %>% round(1),
   "Верхняя граница ДИ" = ((1 - summary(fit, timem)$lower)*100) %>% round(1)
 ) %>% 
-  as_grouped_data(groups = 'strata')
-
-strata <- 'Диабет'
+  mutate(
+    strata = case_when(
+      strata == 'diab=0' ~ 'Нет диабета',
+      strata == 'diab=1' ~ 'Есть диабет',
+      TRUE ~ strata
+    )
+  ) %>% 
+  rename('Статус' = 'strata') %>% 
+  as_grouped_data(groups = 'Статус')
+  
 
 as_flextable(df) %>% 
   theme_box() %>% 
   bg(part = "header", bg = "cornsilk") %>%
-  bg(i = ~ !is.na(strata), bg = "grey90", part = "body") %>%
+  bg(i = ~ !is.na(Статус), bg = "grey90", part = "body") %>%
   align(part = 'all', align = 'center') %>% 
   set_table_properties(layout = 'autofit', width = 1) %>% 
   set_caption('Таблица - Характеристика вероятнотей трансплантации во времени в зависимости от дня')
@@ -452,9 +482,11 @@ hazard_df <- data.frame(
 ggplot(hazard_df, aes(x = time, y = hazard, color = diab)) +
   geom_line(size = 1.2) +
   labs(title = "Hazard функции по полу (muhaz)",
-       x = "Время (дни)", y = "интенсивность риска трнасплантации", color = "Статус диабета") +
+       x = "Время (дни)", y = "интенсивность риска трнасплантации", color = "Статус диабета")+
   scale_x_continuous(breaks=seq(0,2000,180))+
-  scale_color_manual(values = diabcolors) 
+  scale_color_manual(values = diabcolors,
+                     labels = c('0' = 'Нет',
+                                '1' = 'Есть')) 
 ```
 
 HR рассчитывали до 2040 и 1353 дня для пациетов без диабета и с диагнастированным диабетом, т.к. за этот срок у 90% пациентов групп проведена трансплантация почки, после данной точки количества наблюдений значительно снижается и значени HR становятся нестабильными. 
@@ -534,7 +566,13 @@ pl2$plot+
 
 ```{r}
 cox_zph <- cox.zph(cox_modelmine)
-cox_zph$table 
+cox_zph$table %>% 
+  data.frame() %>% 
+  mutate(
+    Variable = rownames(.)
+  ) %>% 
+  relocate(Variable, .before = 1) %>% 
+  flextable()
 ```
 
 Иходя из полученных значений: для переменной диабета P-value > 0.05, т.е. не выявлено статистически значимых нарушений пропорциональности; для пациентов переменной мед.центра P-value < 0.05, выявлены статистически значимые нарушений пропорциональности. Общая модель имеет P-value < 0.05, т.е. модель в целом  нарушает условие пропорциональности рисков.
@@ -563,13 +601,11 @@ cph_model <- cph(Surv(Twaiting, as.numeric(Status_max_numeric)) ~ diab + Level,
 
 # VIF через rms
 vif_results <- vif(cph_model)
-print(vif_results)
+print(vif_results) 
 ```
 Полученные значения VIF ~ 1, т.е. мультиколлиреарности наших перменных не наблюдается.
 
 ## Оценки модели
-
-
 ```{r}
 # Выводим summary модели
 summary(cox_modelmine)
