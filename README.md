@@ -9,6 +9,8 @@
 
 **ADaM coding** – практика основ статистического программирования. Файл admh.Rmd содержит код сборки датасета с анамнезом субъектов согласно спецификации.
 
+**specifics_of_med_data_task** - практика построения и анализа ROC-кривой с использованием пакета pROC.
+
 **survival_analysis** – практика построения и интепретации кривой Каплана-Мейера и Hazart rate с применением пакетов survival, survminer и biostat3.
 
 **basic_datavis_hw1_2025** и **basic_datavis_hw2_2025** – практика базовой визуализации данных с применением пакетов ggplot2, patchwork, ggsignif, gghighlight, treemapify и ggimage. 
