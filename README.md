@@ -16,6 +16,8 @@
 **basic_datavis_hw1_2025** и **basic_datavis_hw2_2025** – практика базовой визуализации данных с применением пакетов ggplot2, patchwork, ggsignif, gghighlight, treemapify и ggimage. 
 Файлы BI_retarining_datavis_hw_1.qmd и BI_retarining_datavis_hw_2.qmd в соответствующих папках содержат в себе код для базовой визуализации данных.
 
+**MultidimentionalAnalysis_HW** - практика применения методов многомерного анализа (PCA), кластеризации и классификации данных с использованием пакетов factoextra, pheatmap, GGally и umap.
+
 **probability_theory** – практика создания виртуальный эксперимента для анализа возникновения ошибки в оценке вероятности события в зависимости от истинной вероятности и объема выборки. 
 Файл Estimation_of_probability.rmd содержит код для проведения виртуального эксперимента.
 
